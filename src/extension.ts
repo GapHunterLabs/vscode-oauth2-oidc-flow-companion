@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { generateCodeVerifier, computeCodeChallengeS256, buildAuthorizationUrl } from './pkce';
 import { decodeIdToken, JwtDecodeError } from './jwtDecode';
+import { recordHit } from './reviewPrompt';
 
 function getWebviewHtml(): string {
   return `<!DOCTYPE html>
@@ -131,6 +132,9 @@ export function activate(context: vscode.ExtensionContext): void {
               codeChallenge: message.codeChallenge ?? '',
             });
             void panel.webview.postMessage({ type: 'urlResult', url });
+            // A real authorization URL was actually built -- never fires
+            // on the invalid-input branch above.
+            recordHit(context);
           } catch (error) {
             void panel.webview.postMessage({ type: 'urlResult', error: `Invalid input: ${(error as Error).message}` });
           }
@@ -140,6 +144,9 @@ export function activate(context: vscode.ExtensionContext): void {
           try {
             const result = decodeIdToken(message.token ?? '');
             void panel.webview.postMessage({ type: 'decodeResult', header: result.header, payload: result.payload });
+            // A real ID token was actually decoded -- never fires on the
+            // decode-error branch below.
+            recordHit(context);
           } catch (error) {
             const errorMessage = error instanceof JwtDecodeError ? error.message : String(error);
             void panel.webview.postMessage({ type: 'decodeResult', error: errorMessage });
